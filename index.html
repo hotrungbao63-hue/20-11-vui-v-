@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rồng Phượng & Pháo Hoa 20/11 - Tri Ân Thầy Cô</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    background: #000000;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+  }
+  .container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: #000000;
+    overflow: hidden;
+  }
+  #roseCanvas {
+    display: block;
+    position: absolute;
+    top: 0; left: 0;
+    z-index: 1;
+  }
+
+  #pressBtn {
+    position: absolute;
+    bottom: 10%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    padding: 20px 60px;
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    color: #fff;
+    background: linear-gradient(135deg, #ff2e88, #ff6ec7);
+    border: 3px solid #fff;
+    border-radius: 60px;
+    cursor: pointer;
+    display: none;
+    box-shadow: 0 0 30px #ff2e88, 0 0 60px #ff2e88;
+    text-shadow: 0 0 10px #fff;
+    animation: btnPulse 1.5s infinite alternate;
+    transition: transform 0.2s;
+  }
+  #pressBtn:hover {
+    transform: translateX(-50%) scale(1.1);
+    box-shadow: 0 0 60px #ff6ec7, 0 0 120px #ff6ec7;
+  }
+  #pressBtn:active { transform: translateX(-50%) scale(0.95); }
+  @keyframes btnPulse {
+    0% { box-shadow: 0 0 25px #ff2e88, 0 0 50px #ff2e88; }
+    100% { box-shadow: 0 0 50px #ff6ec7, 0 0 100px #ff6ec7; }
+  }
+
+  #messageBox {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 30;
+    display: none;
+    pointer-events: none;
+    align-items: center;
+    justify-content: center;
+  }
+  #messageBox.show {
+    display: flex;
+  }
+
+  #message {
+    width: 92%;
+    max-width: 900px;
+    font-size: 42px;
+    font-weight: 900;
+    color: #ffffff;
+    -webkit-text-stroke: 2px #ff4d6d;
+    text-shadow:
+      0 0 15px #fff,
+      0 0 30px #ff4d6d,
+      0 0 60px #ff4d6d,
+      0 0 90px #ff4d6d;
+    letter-spacing: 3px;
+    text-align: center;
+    line-height: 1.7;
+    white-space: normal;
+    opacity: 0;
+    transform: translateY(40px) scale(0.9);
+    transition: opacity 3.5s ease-in, transform 3.5s ease-out;
+  }
+  #message.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  #musicToggle {
+    position: absolute;
+    bottom: 4%;
+    right: 4%;
+    z-index: 50;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    background: linear-gradient(135deg, #ff2e88, #ff6ec7);
+    color: #fff;
+    font-size: 24px;
+    cursor: pointer;
+    box-shadow: 0 0 20px #ff2e88;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s;
+  }
+  #musicToggle:hover { transform: scale(1.1); }
+  #musicToggle.show { display: flex; }
+
+  @media (max-width: 700px) {
+    #message {
+      font-size: 22px;
+      letter-spacing: 1px;
+      -webkit-text-stroke: 1px #ff4d6d;
+      line-height: 1.6;
+    }
+    #pressBtn { font-size: 20px; padding: 16px 40px; }
+  }
+</style>
+</head>
+<body>
+<div class="container" id="container">
+  <canvas id="roseCanvas"></canvas>
+  <button id="pressBtn">NHẤN VÀO ĐÂY</button>
+  <div id="messageBox">
+    <div id="message">
+      NHÂN NGÀY 20/11<br>
+      NGÀY NHÀ GIÁO VIỆT NAM<br>
+      CON XIN GỬI LỜI TRI ÂN<br>
+      ĐẾN THẦY CÔ VÀ MẸ<br>
+      CHÚC MẠNH KHỎE - HẠNH PHÚC<br>
+      VÀ TRÀN ĐẦY NIỀM VUI
+    </div>
+  </div>
+  <button id="musicToggle" title="Bật/Tắt nhạc">🎵</button>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('roseCanvas');
+  const ctx = canvas.getContext('2d');
+  const pressBtn = document.getElementById('pressBtn');
+  const messageBox = document.getElementById('messageBox');
+  const messageEl = document.getElementById('message');
+  const container = document.getElementById('container');
+  const musicToggle = document.getElementById('musicToggle');
+
+  let W, H;
+  let animId = null;
+  let startTime = null;
+  let progress = 0;
+  let done = false;
+  let showMessageMode = false;
+  const DURATION = 3500;
+
+  function resize() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W;
+    canvas.height = H;
+  }
+  resize();
+
+  // ==================== ÂM THANH TỔNG HỢP (Web Audio API) ====================
+  // Giai điệu nhẹ nhàng, dễ nghe, không cần file ngoài
+  let audioCtx = null;
+  let musicPlaying = false;
+  let musicTimeout = null;
+  let masterGain = null;
+
+  // Giai điệu 20/11: chuỗi nốt nhạc nhẹ nhàng (tần số Hz)
+  // Sử dụng thang ngũ cung (pentatonic) để nghe êm tai
+  const MELODY = [
+    // Đoạn 1: khởi đầu nhẹ nhàng
+    { note: 523.25, dur: 0.5 }, // C5
+    { note: 587.33, dur: 0.5 }, // D5
+    { note: 659.25, dur: 0.5 }, // E5
+    { note: 783.99, dur: 0.75 }, // G5
+    { note: 659.25, dur: 0.5 }, // E5
+    { note: 587.33, dur: 0.5 }, // D5
+    { note: 523.25, dur: 0.75 }, // C5
+    // Đoạn 2: cao hơn một chút
+    { note: 587.33, dur: 0.5 }, // D5
+    { note: 659.25, dur: 0.5 }, // E5
+    { note: 783.99, dur: 0.5 }, // G5
+    { note: 880.00, dur: 0.75 }, // A5
+    { note: 783.99, dur: 0.5 }, // G5
+    { note: 659.25, dur: 0.5 }, // E5
+    { note: 587.33, dur: 0.75 }, // D5
+    // Đoạn 3: lặp lại motif chính, kết thúc dịu
+    { note: 523.25, dur: 0.5 }, // C5
+    { note: 659.25, dur: 0.5 }, // E5
+    { note: 783.99, dur: 0.5 }, // G5
+    { note: 1046.50, dur: 0.75 }, // C6
+    { note: 783.99, dur: 0.5 }, // G5
+    { note: 659.25, dur: 0.5 }, // E5
+    { note: 523.25, dur: 1.0 }  // C5 (kết)
+  ];
+
+  // Nốt bass nền (hợp âm đơn giản)
+  const BASS = [
+    { note: 130.81, dur: 2.0 }, // C3
+    { note: 146.83, dur: 2.0 }, // D3
+    { note: 164.81, dur: 2.0 }, // E3
+    { note: 196.00, dur: 2.0 }, // G3
+  ];
+
+  function initAudio() {
+    if (audioCtx) return;
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = 0.18; // Âm lượng nhẹ nhàng, dễ nghe
+      masterGain.connect(audioCtx.destination);
+    } catch (e) {
+      console.warn('Web Audio API không được hỗ trợ:', e);
+    }
+  }
+
+  // Phát một nốt đơn với envelope mềm mại
+  function playNote(freq, startTime, duration, type, gainValue) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+
+    // Envelope: fade in nhanh, fade out mềm
+    const attack = 0.02;
+    const release = duration * 0.6;
+    const peak = gainValue || 0.25;
+
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(peak, startTime + attack);
+    gain.gain.setValueAtTime(peak, startTime + duration - release);
+    gain.gain.linearRampToValueAtTime(0.0001, startTime + duration);
+
+    osc.connect(gain);
+    gain.connect(masterGain);
+
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.05);
+  }
+
+  // Vòng lặp phát giai điệu
+  function scheduleMelody() {
+    if (!audioCtx || !musicPlaying) return;
+
+    const now = audioCtx.currentTime + 0.1;
+    let t = now;
+
+    // Phát giai điệu chính (đàn tranh / sine mềm)
+    for (const n of MELODY) {
+      playNote(n.note, t, n.dur, 'sine', 0.22);
+      // Thêm harmonic nhẹ để nghe ấm hơn (như tiếng đàn)
+      playNote(n.note * 2, t, n.dur * 0.8, 'triangle', 0.05);
+      t += n.dur;
+    }
+
+    // Phát bass nền song song
+    let bt = now;
+    for (const b of BASS) {
+      playNote(b.note, bt, b.dur, 'sine', 0.12);
+      bt += b.dur;
+    }
+
+    // Tính tổng thời gian của một vòng
+    const totalDur = MELODY.reduce((s, n) => s + n.dur, 0);
+    const loopTime = totalDur * 1000 + 500; // nghỉ 0.5s giữa các vòng
+
+    musicTimeout = setTimeout(() => {
+      scheduleMelody();
+    }, loopTime);
+  }
+
+  function startMusic() {
+    initAudio();
+    if (!audioCtx) return;
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    if (musicPlaying) return;
+    musicPlaying = true;
+    musicToggle.classList.add('show');
+    musicToggle.textContent = '🔊';
+    scheduleMelody();
+  }
+
+  function stopMusic() {
+    musicPlaying = false;
+    if (musicTimeout) {
+      clearTimeout(musicTimeout);
+      musicTimeout = null;
+    }
+    musicToggle.textContent = '🔇';
+  }
+
+  musicToggle.addEventListener('click', () => {
+    if (musicPlaying) {
+      stopMusic();
+    } else {
+      startMusic();
+    }
+  });
+
+  // ==================== RỒNG & PHƯỢNG HOÀNG ====================
+  function drawDragonPhoenix(t) {
+    const cx = W / 2;
+    const cy = H / 2;
+    const scale = Math.min(W, H) / 900;
+    const time = t / 1000;
+    const pulse = 0.85 + Math.sin(time * 1.5) * 0.05;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(scale * pulse, scale * pulse);
+
+    drawDragon(-80, 0, time);
+    drawPhoenix(80, 0, time);
+
+    const orbGlow = 30 + Math.sin(time * 3) * 10;
+    const orbGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, orbGlow);
+    orbGrad.addColorStop(0, '#ffffff');
+    orbGrad.addColorStop(0.3, '#ffe066');
+    orbGrad.addColorStop(0.7, '#ff8c00');
+    orbGrad.addColorStop(1, 'rgba(255,140,0,0)');
+    ctx.fillStyle = orbGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, orbGlow, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawDragon(baseX, baseY, time) {
+    ctx.save();
+    ctx.translate(baseX, baseY);
+    const bodyLen = 180;
+    const wave = Math.sin(time * 2) * 8;
+    ctx.shadowColor = '#ffcc00';
+    ctx.shadowBlur = 15;
+
+    for (let i = 0; i < 30; i++) {
+      const t1 = i / 30;
+      const t2 = (i + 1) / 30;
+      const x1 = -bodyLen * (1 - t1) + Math.sin(t1 * 6 + time * 2) * 12;
+      const y1 = Math.cos(t1 * 5 + time * 1.5) * 25 * (1 - t1 * 0.5);
+      const x2 = -bodyLen * (1 - t2) + Math.sin(t2 * 6 + time * 2) * 12;
+      const y2 = Math.cos(t2 * 5 + time * 1.5) * 25 * (1 - t2 * 0.5);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = `hsl(45, 100%, ${55 + t1 * 25}%)`;
+      ctx.lineWidth = 12 * (1 - t1 * 0.7) + 3;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+
+    const headX = 30;
+    const headY = Math.cos(5 + time * 1.5) * 25 * 0.5 + wave * 0.3;
+    ctx.save();
+    ctx.translate(headX, headY);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 28, 20, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffd700';
+    ctx.shadowColor = '#ffaa00';
+    ctx.shadowBlur = 25;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(8, -5, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ff2200';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(9, -5, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-5, -15);
+    ctx.lineTo(-15, -35);
+    ctx.lineTo(-2, -18);
+    ctx.fillStyle = '#ffaa00';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(5, -15);
+    ctx.lineTo(0, -38);
+    ctx.lineTo(10, -18);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(20, 5);
+    ctx.quadraticCurveTo(45, 15 + Math.sin(time * 3) * 5, 55, 5 + Math.sin(time * 3) * 8);
+    ctx.strokeStyle = '#ffcc00';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.restore();
+
+    for (let i = 0; i < 8; i++) {
+      const t = i / 8;
+      const x = -bodyLen * (1 - t) + Math.sin(t * 6 + time * 2) * 12;
+      const y = Math.cos(t * 5 + time * 1.5) * 25 * (1 - t * 0.5);
+      ctx.beginPath();
+      ctx.moveTo(x, y - 8);
+      ctx.lineTo(x - 5, y - 25);
+      ctx.lineTo(x + 5, y - 8);
+      ctx.fillStyle = `hsla(45, 100%, 60%, ${0.8 - t * 0.5})`;
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawPhoenix(baseX, baseY, time) {
+    ctx.save();
+    ctx.translate(baseX, baseY);
+    const bodyLen = 180;
+    const wave = Math.sin(time * 2 + Math.PI) * 8;
+    ctx.shadowColor = '#ff4400';
+    ctx.shadowBlur = 15;
+
+    for (let i = 0; i < 30; i++) {
+      const t1 = i / 30;
+      const t2 = (i + 1) / 30;
+      const x1 = bodyLen * (1 - t1) - Math.sin(t1 * 6 + time * 2) * 12;
+      const y1 = Math.cos(t1 * 5 + time * 1.5) * 25 * (1 - t1 * 0.5);
+      const x2 = bodyLen * (1 - t2) - Math.sin(t2 * 6 + time * 2) * 12;
+      const y2 = Math.cos(t2 * 5 + time * 1.5) * 25 * (1 - t2 * 0.5);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = `hsl(15, 100%, ${55 + t1 * 25}%)`;
+      ctx.lineWidth = 12 * (1 - t1 * 0.7) + 3;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+
+    const headX = -30;
+    const headY = Math.cos(5 + time * 1.5) * 25 * 0.5 + wave * 0.3;
+    ctx.save();
+    ctx.translate(headX, headY);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 26, 20, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#ff6347';
+    ctx.shadowColor = '#ff2200';
+    ctx.shadowBlur = 25;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.beginPath();
+    ctx.arc(-8, -5, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffdd00';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(-9, -5, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-5, -18);
+    ctx.quadraticCurveTo(-20, -50, -8, -55);
+    ctx.quadraticCurveTo(0, -45, -2, -20);
+    ctx.fillStyle = '#ff4500';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(5, -18);
+    ctx.quadraticCurveTo(5, -55, 18, -50);
+    ctx.quadraticCurveTo(15, -40, 10, -20);
+    ctx.fillStyle = '#ff6347';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-20, 5);
+    ctx.lineTo(-40, 10);
+    ctx.lineTo(-20, 15);
+    ctx.fillStyle = '#ffdd00';
+    ctx.fill();
+    ctx.restore();
+
+    for (let i = 0; i < 12; i++) {
+      const t = i / 12;
+      const angle = Math.PI * 0.3 + t * Math.PI * 1.4 + Math.sin(time * 2) * 0.05;
+      const len = 70 + Math.sin(time * 3 + i) * 15;
+      const x = bodyLen * (1 - t) - Math.sin(t * 6 + time * 2) * 12;
+      const y = Math.cos(t * 5 + time * 1.5) * 25 * (1 - t * 0.5);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len * 0.7 + 30);
+      ctx.strokeStyle = `hsla(${15 + i * 8}, 100%, 60%, ${0.85 - t * 0.3})`;
+      ctx.lineWidth = 4 * (1 - t * 0.5) + 1.5;
+      ctx.shadowColor = '#ff6600';
+      ctx.shadowBlur = 12;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(angle) * len, y + Math.sin(angle) * len * 0.7 + 30, 4, 0, Math.PI * 2);
+      ctx.fillStyle = `hsl(${45 + i * 5}, 100%, 70%)`;
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ==================== PHÁO HOA ====================
+  let fireworks = [];
+  let fireworkTimer = 0;
+
+  function spawnFirework() {
+    const startX = Math.random() * W * 0.8 + W * 0.1;
+    const startY = H + 20;
+    const targetY = Math.random() * H * 0.45 + H * 0.05;
+    const targetX = startX + (Math.random() - 0.5) * 200;
+    const hue = Math.random() * 360;
+    fireworks.push({
+      x: startX, y: startY, startX, startY, targetX, targetY,
+      vx: (targetX - startX) / 60,
+      vy: (targetY - startY) / 60,
+      hue, exploded: false, particles: [], trail: []
+    });
+  }
+
+  function updateFireworks(t) {
+    fireworkTimer++;
+    if (fireworkTimer > 45 && Math.random() < 0.35) {
+      spawnFirework();
+      fireworkTimer = 0;
+    }
+    if (fireworks.length === 0 && t > 500) {
+      spawnFirework();
+      spawnFirework();
+    }
+
+    for (let i = fireworks.length - 1; i >= 0; i--) {
+      const fw = fireworks[i];
+      if (!fw.exploded) {
+        fw.x += fw.vx;
+        fw.y += fw.vy;
+        fw.vy += 0.05;
+        fw.trail.push({ x: fw.x, y: fw.y, alpha: 1 });
+        if (fw.trail.length > 12) fw.trail.shift();
+        if (fw.y <= fw.targetY || fw.vy > 0) {
+          fw.exploded = true;
+          const pCount = 50 + Math.floor(Math.random() * 40);
+          for (let p = 0; p < pCount; p++) {
+            const angle = (p / pCount) * Math.PI * 2 + Math.random() * 0.3;
+            const speed = 2 + Math.random() * 5;
+            fw.particles.push({
+              x: fw.x, y: fw.y,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              life: 1,
+              decay: 0.012 + Math.random() * 0.015,
+              hue: fw.hue + (Math.random() - 0.5) * 40,
+              size: 1.5 + Math.random() * 2.5
+            });
+          }
+        }
+      } else {
+        let allDead = true;
+        for (const p of fw.particles) {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vx *= 0.98;
+          p.vy *= 0.98;
+          p.vy += 0.04;
+          p.life -= p.decay;
+          if (p.life > 0) allDead = false;
+        }
+        if (allDead) fireworks.splice(i, 1);
+      }
+    }
+  }
+
+  function drawFireworks() {
+    for (const fw of fireworks) {
+      if (!fw.exploded) {
+        for (let i = 0; i < fw.trail.length; i++) {
+          const tr = fw.trail[i];
+          const a = (i / fw.trail.length) * 0.7;
+          ctx.beginPath();
+          ctx.arc(tr.x, tr.y, 2, 0, Math.PI * 2);
+          ctx.fillStyle = `hsla(${fw.hue}, 100%, 70%, ${a})`;
+          ctx.fill();
+        }
+        ctx.beginPath();
+        ctx.arc(fw.x, fw.y, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = `hsl(${fw.hue}, 100%, 80%)`;
+        ctx.shadowColor = `hsl(${fw.hue}, 100%, 60%)`;
+        ctx.shadowBlur = 20;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      } else {
+        for (const p of fw.particles) {
+          if (p.life <= 0) continue;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+          ctx.fillStyle = `hsla(${p.hue}, 100%, ${50 + p.life * 30}%, ${p.life})`;
+          ctx.shadowColor = `hsl(${p.hue}, 100%, 60%)`;
+          ctx.shadowBlur = 15 * p.life;
+          ctx.fill();
+        }
+        ctx.shadowBlur = 0;
+      }
+    }
+  }
+
+  // ==================== VẼ CẢNH ====================
+  function drawScene(p, t) {
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, W, H);
+
+    if (!showMessageMode) {
+      drawStars(t);
+      drawDragonPhoenix(t);
+    }
+
+    updateFireworks(t);
+    drawFireworks();
+  }
+
+  let stars = [];
+  function generateStars() {
+    stars = [];
+    for (let i = 0; i < 120; i++) {
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H * 0.7,
+        r: Math.random() * 1.5 + 0.3,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.5 + Math.random() * 2
+      });
+    }
+  }
+
+  function drawStars(t) {
+    for (const s of stars) {
+      const alpha = 0.3 + Math.abs(Math.sin(t / 1000 * s.speed + s.phase)) * 0.7;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+      ctx.fill();
+    }
+  }
+
+  // ==================== ANIMATION ====================
+  function animate(ts) {
+    if (!startTime) startTime = ts;
+    const el = ts - startTime;
+    const raw = Math.min(el / DURATION, 1);
+    progress = raw < 0.5 ? 2 * raw * raw : 1 - Math.pow(-2 * raw + 2, 2) / 2;
+    drawScene(progress, ts);
+    if (raw < 1) {
+      animId = requestAnimationFrame(animate);
+    } else {
+      done = true;
+      progress = 1;
+      drawScene(1, ts);
+      pressBtn.style.display = 'block';
+    }
+  }
+
+  let renderLoop = null;
+  function startRenderLoop() {
+    if (renderLoop) return;
+    const loop = (ts) => {
+      drawScene(1, ts);
+      renderLoop = requestAnimationFrame(loop);
+    };
+    renderLoop = requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', () => {
+    resize();
+    generateStars();
+    drawScene(done ? 1 : progress, performance.now());
+  });
+
+  // ==================== NÚT NHẤN + BẬT NHẠC ====================
+  pressBtn.addEventListener('click', () => {
+    pressBtn.style.display = 'none';
+    showMessageMode = true;
+
+    // Bật nhạc tổng hợp ngay khi nhấn nút (đảm bảo trình duyệt cho phép)
+    startMusic();
+
+    messageBox.classList.add('show');
+    messageEl.classList.remove('show');
+    void messageEl.offsetWidth;
+    setTimeout(() => messageEl.classList.add('show'), 300);
+  });
+
+  // Tự động thử phát nhạc khi trang load (nếu trình duyệt cho phép)
+  // Hầu hết trình duyệt sẽ chặn, nên nút nhấn là cách chính
+  window.addEventListener('load', () => {
+    resize();
+    generateStars();
+    animId = requestAnimationFrame(animate);
+    setTimeout(() => {
+      startRenderLoop();
+    }, DURATION + 100);
+
+    // Thử khởi tạo audio context (chưa phát)
+    initAudio();
+  });
+})();
+</script>
+</body>
+</html>
